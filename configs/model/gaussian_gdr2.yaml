@@ -1,0 +1,73 @@
+_target_: src.models.gdr_classification.GDRClassification
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+  weight_decay: 0.0
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 10
+
+
+graph_conv:
+  _target_: src.models.components.graph_conv.MyGraphConv
+  input_size: 4
+  hidden_size: 64
+  output_size: 64
+  num_sub_nodes: 5
+
+# GCN 输出后的维度是[batch_size, N, K]
+# diffusion需要channel维度[batch_size, N, K, channel]，这里直接设置为1
+# [batch_size, N, K, 1]
+# 另外需要修改N != K，而不是默认“图片”为[img_size, img_size]
+graph_diffusion:
+  _target_: src.models.components.graph_diffusion.GDR
+  input_size: 4
+#  hidden_size: 64
+#  output_size: 2
+#  num_sub_nodes: 5
+  diffusion_component:
+    _target_: src.models.components.diffusion_torch.GaussianDiffusion
+    model:
+      _target_: src.models.components.diffusion_torch.Unet
+      dim: 64
+      init_dim: null
+      out_dim: null
+      dim_mults: [2]
+      channels: 1
+      self_condition: False
+      resnet_block_groups: 8
+      learned_variance: False
+      learned_sinusoidal_cond: False
+      random_fourier_features: False
+      learned_sinusoidal_dim: 16
+      sinusoidal_pos_emb_theta: 10000
+      attn_dim_head: 32
+      attn_heads: 4
+    image_size: 64
+    timesteps: 10
+    sampling_timesteps: null
+    objective: 'pred_v'
+    beta_schedule: 'sigmoid'
+    schedule_fn_kwargs: {}
+    ddim_sampling_eta: 0.0
+    auto_normalize: true
+    offset_noise_strength: 0.0
+    min_snr_loss_weight: False
+    min_snr_gamma: 5
+
+graph_decoder:
+  _target_: src.models.components.graph_decoder.GraphDecoder
+
+graph_classifier:
+  _target_: src.models.components.graph_classifier.GraphClassifier
+  input_size: 64
+  output_size: 1
+
+# compile model for faster training with pytorch 2.0
+compile: false
